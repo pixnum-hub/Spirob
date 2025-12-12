@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spirob - Ultimate Spirograph Studio</title>
+<style>
+html,body{margin:0;padding:0;width:100%;overflow-x:hidden;background:#e0e0e0;font-family:"Segoe UI",sans-serif;display:flex;justify-content:center;}
+.app-container{width:100%;max-width:750px;padding:15px;box-sizing:border-box;border-radius:25px;background:#e0e0e0;margin:15px;box-shadow:9px 9px 20px #b8b8b8,-9px -9px 20px #fff;display:flex;flex-direction:column;align-items:center;}
+.header{width:100%;display:flex;justify-content:space-between;align-items:center;}
+.dark-mode-toggle{font-size:1.5rem;cursor:pointer;border-radius:50%;padding:10px;border:2px solid #bbb;box-shadow:4px 4px 8px #bebebe,-4px -4px 8px #fff;}
+canvas{width:100%!important;height:auto!important;border-radius:20px;margin:20px 0;display:block;box-shadow:inset 5px 5px 10px #bebebe,inset -5px -5px 10px #fff;}
+.controls{width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;align-items:center;justify-items:center;}
+label{display:flex;flex-direction:column;align-items:center;font-size:0.85rem;width:100%;}
+input[type="range"],input[type="color"],input[type="number"],select{width:100%;box-sizing:border-box;border-radius:12px;border:none;padding:6px 4px;margin-top:4px;box-shadow: inset 2px 2px 4px #bcbcbc, inset -2px -2px 4px #fff;}
+button{padding:10px 14px;border-radius:14px;border:none;font-size:0.9rem;cursor:pointer;background:#e0e0e0;box-shadow:4px 4px 8px #bebebe,-4px -4px 8px #fff;width:100%;}
+button:hover{box-shadow:inset 3px 3px 6px #b8b8b8,inset -3px -3px 6px #fff;}
+footer{margin-top:20px;font-size:0.75rem;color:#555;text-align:center;}
+body.dark{background:#1c1c1c;color:#eee;}
+body.dark .app-container{background:#1c1c1c;box-shadow:9px 9px 20px #121212,-9px -9px 20px #2a2a2a;}
+body.dark canvas{box-shadow:inset 5px 5px 10px #121212,inset -5px -5px 10px #2a2a2a;}
+body.dark input,body.dark select,body.dark button{background:#1c1c1c;color:#eee;box-shadow:inset 3px 3px 6px #121212,inset -3px -3px 6px #2a2a2a;}
+body.dark .dark-mode-toggle{box-shadow:4px 4px 8px #121212,-4px -4px 8px #2a2a2a;}
+</style>
+</head>
+<body>
+<div class="app-container">
+  <div class="header">
+    <h2>Spirob</h2>
+    <div class="dark-mode-toggle" id="darkToggle">🌙</div>
+  </div>
+
+  <canvas id="spiroCanvas"></canvas>
+
+  <div class="controls">
+    <label>Outer Radius (R)<input type="range" id="R" min="10" max="300" value="100"/></label>
+    <label>Inner Radius (r)<input type="range" id="r" min="5" max="150" value="50"/></label>
+    <label>Pen Distance (d)<input type="range" id="d" min="5" max="150" value="30"/></label>
+    <label>Speed<input type="range" id="speed" min="0.01" max="0.2" step="0.01" value="0.05"/></label>
+    <label>Line Thickness<input type="range" id="thickness" min="1" max="5" value="1"/></label>
+    <label>Layers<input type="range" id="layers" min="1" max="5" value="1"/></label>
+    <label><input type="checkbox" id="rainbowMode"/> Rainbow Mode</label>
+    <label><input type="checkbox" id="kaleidoscope"/> Kaleidoscope</label>
+    <label><input type="checkbox" id="mirrorMode"/> Mirror Mode</label>
+    <label>Default Color<input type="color" id="defaultColor" value="#ff0000"/></label>
+    <label>Number of Spirographs<input type="range" id="numSpiro" min="1" max="5" value="1"/></label>
+    <label>Gradient Start<input type="color" id="gradStart" value="#ff0000"/></label>
+    <label>Gradient End<input type="color" id="gradEnd" value="#0000ff"/></label>
+    <label><input type="checkbox" id="gradientMode"/> Use Gradient</label>
+    <label>Export Scale<select id="scaleFactor"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+    <label>Duration (s)<input type="number" id="duration" min="1" max="30" value="5"/></label>
+    <label>Preset<select id="preset"><option value="">Select</option><option value="classic">Classic</option><option value="kaleidoscope">Kaleidoscope</option><option value="flower">Flower</option><option value="stars">Stars</option><option value="spiral">Spiral</option><option value="web">Web</option></select></label>
+    <label>Palettes<select id="paletteList"><option value="">Select</option></select></label>
+    <button id="savePalette">Save Palette</button>
+    <button id="loadPalette">Load Palette</button>
+    <button id="drawBtn">Draw</button>
+    <button id="pauseBtn">Pause</button>
+    <button id="playBtn">Play</button>
+    <button id="stopBtn">Stop</button>
+    <button id="randomBtn">Randomize</button>
+    <button id="downloadPNGBtn">Download PNG</button>
+    <button id="downloadGIFBtn">Download GIF</button>
+    <button id="downloadMP4Btn">Download MP4</button>
+  </div>
+  <footer>© Manik Roy 2025. All Rights Reserved.</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/build/CCapture.all.min.js"></script>
+<script>
+// === Canvas Setup ===
+const canvas=document.getElementById("spiroCanvas");
+const ctx=canvas.getContext("2d");
+function resizeCanvas(){const w=document.querySelector(".app-container").clientWidth;canvas.width=w-30;canvas.height=w-30;resetCanvas();}
+window.addEventListener("load",resizeCanvas);
+window.addEventListener("resize",resizeCanvas);
+
+// === Controls ===
+const RInput=document.getElementById("R"), rInput=document.getElementById("r"), dInput=document.getElementById("d"),
+speedInput=document.getElementById("speed"), thicknessInput=document.getElementById("thickness"),
+layersInput=document.getElementById("layers"), rainbowCheckbox=document.getElementById("rainbowMode"),
+kaleidoscopeCheckbox=document.getElementById("kaleidoscope"), mirrorCheckbox=document.getElementById("mirrorMode"),
+gradientCheckbox=document.getElementById("gradientMode"), gradStartInput=document.getElementById("gradStart"),
+gradEndInput=document.getElementById("gradEnd"), defaultColorInput=document.getElementById("defaultColor"),
+durationInput=document.getElementById("duration"), numSpiroInput=document.getElementById("numSpiro"),
+scaleFactorInput=document.getElementById("scaleFactor"), presetSelect=document.getElementById("preset"),
+savePaletteBtn=document.getElementById("savePalette"), loadPaletteBtn=document.getElementById("loadPalette"),
+paletteList=document.getElementById("paletteList"), drawBtn=document.getElementById("drawBtn"),
+pauseBtn=document.getElementById("pauseBtn"), playBtn=document.getElementById("playBtn"),
+stopBtn=document.getElementById("stopBtn"), randomBtn=document.getElementById("randomBtn"),
+downloadPNGBtn=document.getElementById("downloadPNGBtn"), downloadGIFBtn=document.getElementById("downloadGIFBtn"),
+downloadMP4Btn=document.getElementById("downloadMP4Btn");
+
+let t=0, animation=null, paused=false, capturer=null, capturing=false, palettes={};
+
+// Load saved palettes
+window.addEventListener("load",()=>{
+  const savedPalettes=JSON.parse(localStorage.getItem("spiroPalettes")||"{}");palettes=savedPalettes;
+  paletteList.innerHTML='<option value="">Select</option>';
+  for(const n in palettes){const o=document.createElement("option");o.value=n;o.textContent=n;paletteList.appendChild(o);}
+});
+
+// HSV to RGB for rainbow
+function hsvToRgb(h,s,v){let c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c,r=0,g=0,b=0;
+if(0<=h&&h<60){r=c;g=x;b=0;}else if(60<=h&&h<120){r=x;g=c;b=0;}else if(120<=h&&h<180){r=0;g=c;b=x;}
+else if(180<=h&&h<240){r=0;g=x;b=c;}else if(240<=h&&h<300){r=x;g=0;b=c;}else if(300<=h&&h<360){r=c;g=0;b=x;}
+r=Math.round((r+m)*255);g=Math.round((g+m)*255);b=Math.round((b+m)*255);return `rgb(${r},${g},${b})`;}
+
+// === Reset Canvas ===
+function resetCanvas(){cancelAnimationFrame(animation); t=0; paused=false; ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);}
+
+// === Draw Spirograph ===
+function drawSpiro(){
+  if(paused) return;
+  const R=+RInput.value,r=+rInput.value,d=+dInput.value,speed=+speedInput.value,
+  thickness=+thicknessInput.value,layers=+layersInput.value,rainbow=rainbowCheckbox.checked,
+  kaleidoscope=kaleidoscopeCheckbox.checked,mirror=mirrorCheckbox.checked,gradient=gradientCheckbox.checked,
+  cx=canvas.width/2,cy=canvas.height/2,numSpiro=+numSpiroInput.value;
+
+  ctx.fillStyle="rgba(0,0,0,0.06)"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  animation=requestAnimationFrame(drawSpiro);
+
+  for(let s=0;s<numSpiro;s++){
+    const sOffset=s*20;
+    for(let l=0;l<layers;l++){
+      const offset=l*30+sOffset;
+      const x=(R-r)*Math.cos(t+offset)+d*Math.cos(((R-r)/r)*(t+offset))+cx;
+      const y=(R-r)*Math.sin(t+offset)-d*Math.sin(((R-r)/r)*(t+offset))+cy;
+      const copies=mirror?6:(kaleidoscope?6:1);
+
+      for(let i=0;i<copies;i++){
+        const angle=(Math.PI*2/copies)*i;
+        const rx=Math.cos(angle)*(x-cx)-Math.sin(angle)*(y-cy)+cx;
+        const ry=Math.sin(angle)*(x-cx)+Math.cos(angle)*(y-cy)+cy;
+
+        let color=defaultColorInput.value;
+        if(rainbow) color=hsvToRgb((t*60+l*40+s*40)%360,1,1);
+        else if(gradient){
+          const sC=gradStartInput.value,eC=gradEndInput.value,mix=l/layers;
+          const rV=Math.round(parseInt(sC.slice(1,3),16)*(1-mix)+parseInt(eC.slice(1,3),16)*mix);
+          const gV=Math.round(parseInt(sC.slice(3,5),16)*(1-mix)+parseInt(eC.slice(3,5),16)*mix);
+          const bV=Math.round(parseInt(sC.slice(5,7),16)*(1-mix)+parseInt(eC.slice(5,7),16)*mix);
+          color=`rgb(${rV},${gV},${bV})`;
+        }
+
+        ctx.fillStyle=color; ctx.fillRect(rx,ry,thickness,thickness);
+        if(capturing && capturer) capturer.capture(canvas);
+      }
+    }
+  }
+  t+=speed;
+}
+
+// === Event Listeners ===
+[RInput,rInput,dInput,speedInput,thicknessInput,layersInput,rainbowCheckbox,kaleidoscopeCheckbox,mirrorCheckbox,gradientCheckbox,gradStartInput,gradEndInput,defaultColorInput,numSpiroInput].forEach(i=>i.addEventListener("input",()=>{resetCanvas();drawSpiro();}));
+
+drawBtn.addEventListener("click",()=>{paused=false; resetCanvas(); drawSpiro();});
+pauseBtn.addEventListener("click",()=>{paused=true;});
+playBtn.addEventListener("click",()=>{if(paused){paused=false; drawSpiro();}});
+stopBtn.addEventListener("click",resetCanvas);
+
+randomBtn.addEventListener("click",()=>{
+  RInput.value=Math.floor(Math.random()*250)+30; rInput.value=Math.floor(Math.random()*100)+10; dInput.value=Math.floor(Math.random()*100)+5;
+  speedInput.value=(Math.random()*0.15+0.01).toFixed(2); thicknessInput.value=Math.floor(Math.random()*3)+1;
+  layersInput.value=Math.floor(Math.random()*4)+1; rainbowCheckbox.checked=Math.random()>0.5;
+  kaleidoscopeCheckbox.checked=Math.random()>0.5; mirrorCheckbox.checked=Math.random()>0.5;
+  gradientCheckbox.checked=Math.random()>0.5;
+  defaultColorInput.value="#"+Math.floor(Math.random()*16777215).toString(16).padStart(6,"0");
+  gradStartInput.value="#"+Math.floor(Math.random()*16777215).toString(16).padStart(6,"0");
+  gradEndInput.value="#"+Math.floor(Math.random()*16777215).toString(16).padStart(6,"0");
+  numSpiroInput.value=Math.floor(Math.random()*5)+1;
+  resetCanvas(); drawSpiro();
+});
+
+// === High-Resolution PNG Download ===
+downloadPNGBtn.addEventListener("click",()=>{
+  const scale=+scaleFactorInput.value;
+  const tempCanvas=document.createElement("canvas"); tempCanvas.width=canvas.width*scale; tempCanvas.height=canvas.height*scale;
+  const tempCtx=tempCanvas.getContext("2d"); tempCtx.drawImage(canvas,0,0,tempCanvas.width,tempCanvas.height);
+  const a=document.createElement("a"); a.href=tempCanvas.toDataURL(); a.download="spiro.png"; a.click();
+});
+
+// === GIF & MP4 ===
+downloadGIFBtn.addEventListener("click",()=>{
+  const duration=+durationInput.value*1000; capturer=new CCapture({format:'gif',framerate:30}); capturer.start(); capturing=true;
+  setTimeout(()=>{capturer.stop();capturer.save();capturer=null; capturing=false;},duration);
+});
+downloadMP4Btn.addEventListener("click",()=>{
+  const duration=+durationInput.value*1000; const stream=canvas.captureStream(30); const recorder=new MediaRecorder(stream,{mimeType:"video/webm"}); let chunks=[];
+  recorder.ondataavailable=e=>chunks.push(e.data);
+  recorder.onstop=()=>{const blob=new Blob(chunks,{type:"video/webm"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="spiro.mp4"; a.click();};
+  recorder.start(); setTimeout(()=>recorder.stop(),duration);
+});
+
+// === Presets ===
+const presetData={
+  classic:{R:100,r:50,d:30,speed:0.05,thickness:1,layers:1,rainbow:false,kaleidoscope:false,mirror:false,gradient:false,defaultColor:"#ff0000",gradStart:"#ff0000",gradEnd:"#0000ff"},
+  kaleidoscope:{R:80,r:30,d:40,speed:0.05,thickness:1,layers:2,rainbow:false,kaleidoscope:true,mirror:false,gradient:false,defaultColor:"#00ff00",gradStart:"#00ff00",gradEnd:"#0000ff"},
+  flower:{R:90,r:45,d:50,speed:0.08,thickness:1,layers:3,rainbow:true,kaleidoscope:true,mirror:false,gradient:false,defaultColor:"#ff00ff",gradStart:"#ff00ff",gradEnd:"#00ffff"},
+  stars:{R:120,r:50,d:20,speed:0.07,thickness:1,layers:3,rainbow:true,kaleidoscope:true,mirror:false,gradient:false,defaultColor:"#ffff00",gradStart:"#ffff00",gradEnd:"#ff00ff"},
+  spiral:{R:150,r:60,d:70,speed:0.04,thickness:1,layers:4,rainbow:true,kaleidoscope:false,mirror:false,gradient:true,defaultColor:"#ff0000",gradStart:"#ff0000",gradEnd:"#00ff00"},
+  web:{R:100,r:40,d:30,speed:0.05,thickness:1,layers:2,rainbow:false,kaleidoscope:true,mirror:false,gradient:true,defaultColor:"#0000ff",gradStart:"#0000ff",gradEnd:"#ff0000"}
+};
+presetSelect.addEventListener("change",()=>{
+  const v=presetSelect.value;if(!v||!presetData[v])return;
+  const p=presetData[v];
+  RInput.value=p.R;rInput.value=p.r;dInput.value=p.d;speedInput.value=p.speed;thicknessInput.value=p.thickness;layersInput.value=p.layers;
+  rainbowCheckbox.checked=p.rainbow;kaleidoscopeCheckbox.checked=p.kaleidoscope;mirrorCheckbox.checked=p.mirror;gradientCheckbox.checked=p.gradient;
+  defaultColorInput.value=p.defaultColor;gradStartInput.value=p.gradStart;gradEndInput.value=p.gradEnd;
+  resetCanvas(); drawSpiro();
+});
+
+// === Palettes ===
+savePaletteBtn.addEventListener("click",()=>{
+  const name=prompt("Palette name:");if(!name)return;
+  palettes[name]={start:gradStartInput.value,end:gradEndInput.value};
+  localStorage.setItem("spiroPalettes",JSON.stringify(palettes));
+  const opt=document.createElement("option"); opt.value=name; opt.textContent=name; paletteList.appendChild(opt);
+});
+loadPaletteBtn.addEventListener("click",()=>{
+  const name=paletteList.value;if(!name||!palettes[name])return;
+  gradStartInput.value=palettes[name].start; gradEndInput.value=palettes[name].end;
+  resetCanvas(); drawSpiro();
+});
+
+// === Dark Mode Toggle ===
+document.getElementById("darkToggle").addEventListener("click",()=>{
+  document.body.classList.toggle("dark");
+  document.getElementById("darkToggle").textContent=document.body.classList.contains("dark")?"☀️":"🌙";
+});
+
+// === Initial Draw ===
+resetCanvas(); drawSpiro();
+</script>
+</body>
+</html>
